@@ -1,0 +1,414 @@
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script type="text/javascript">
+  //settings
+  var width = 37;
+  var height = 17;
+
+  //code
+  var endPoint = {};
+  var mode = "wall";
+
+  function generateTables()
+  {
+      var body = document.getElementById("table");
+      var html = "";
+      for(var i = 0; i < height; i++)
+      {
+        html += "<div class='row'>";
+        for(var j = 0; j < width; j++)
+        {
+          html += "<div class='cell' isWall='0' isEnd='0' isStart='0' y='" + i + "' x='" + j + "' onclick='Draw(event);'></div>";
+        }
+        html += "</div>";
+      }
+      body.innerHTML= html;
+  }
+
+  function reset(e)
+  {
+    var body = document.getElementById("table");
+    body.innerHTML = "";
+
+    generateTables();
+  }
+
+  function Draw(event)
+  {
+    var items = document.getElementsByClassName("cell");
+    var settings = {wall : 0, end : 0, start : 0, style : ""};
+
+    switch (mode) {
+      case "start":
+        settings.start = 1;
+        settings.style = "background-color:yellow;";
+        break;
+      case "end":
+        settings.end = 1;
+        settings.style = "background-color:red;";
+        break;
+      case "wall":
+        settings.wall = 1;
+        settings.style = "background-color:black;";
+        break;
+      default:break; // remove
+    }
+
+    event.target.setAttribute("isWall", settings.wall);
+    event.target.setAttribute("isEnd", settings.end);
+    event.target.setAttribute("isStart", settings.start);
+    event.target.style = settings.style;
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  $(document).ready(function() {
+      $(document).click(function() {
+          $('#menu').hide();
+      });
+
+      $(".item").click(function() {
+          $(".active").removeClass("active");
+          $(this).addClass("active");
+          mode = $(this).attr("mode");
+          $('#menu').hide();
+      });
+
+      $('#table').bind("contextmenu", function(e) {
+
+          $('#menu').css({
+              top: e.pageY+'px',
+              left: e.pageX+'px'
+          }).show();
+
+          return false;
+
+      });
+
+  });
+
+  //find path
+
+  class Node {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+    }
+
+    static compare(node1, node2)
+    {
+      if(node1 == null || node2 == null)
+        return false;
+
+      if(node1 == node2)
+        return true;
+
+      if(node1.x === node2.x && node1.y === node2.y)
+        return true;
+
+      return false;
+    }
+  }
+
+
+  class Path {
+    constructor(node, parentNode, status) {
+      this.node = node;
+      this.parentNode = parentNode;
+      this.status = status;
+    }
+
+    isFinish()
+    {
+      return this.status == "finish"? true : false;
+    }
+
+    mark()
+    {
+      var arrThis = [this];
+      if(this.parentNode != null)
+      {
+        var arr = this.parentNode.mark().concat(arrThis);
+        return arr;
+      }
+
+      return arrThis;
+    }
+
+    isInside(arr)
+    {
+      for(var i = 0; i < arr.length; i++)
+        if(Node.compare(arr[i].node, this.node))
+          return true;
+      return false;
+    }
+  }
+
+  async function find()
+  {
+    var alreadyChecked = [];
+    var paths = [];
+
+    var startPath = getStartPath();
+    endPoint = getEndNode();
+
+    if(startPath == null)
+    {
+      alert("There was an error in finding the beginning.");
+      return;
+    }
+    if(endPoint == null)
+    {
+      alert("There was an error in finding the ending.");
+      return;
+    }
+
+    $(".cell").prop("onclick", null).off("click");
+
+    paths.push(startPath);
+    alreadyChecked.push(startPath);
+
+    var isFinish = false;
+
+    while (paths.length > 0) {
+      var current = paths[0];
+      paths.shift();
+
+      var nearesNodes = getNearestNodes(current);
+      for(var i = 0; i < nearesNodes.length; i++)
+      {
+        if(!nearesNodes[i].isInside(alreadyChecked))
+        {
+          alreadyChecked.push(nearesNodes[i]);
+          paths.push(nearesNodes[i]);
+        }
+      }
+
+      if(getFinishPath(nearesNodes))break; //break after finish finding
+
+      markPath(nearesNodes, "rgb(149, 158, 157)");
+      await sleep(2);
+    }
+
+    if(finishPathArr = getFinishPath(alreadyChecked))
+      markPath(finishPathArr.mark(), "#73ff00");
+    else {
+      alert("Way is not find.");
+    }
+  }
+
+  function markPath(arr, color)
+  {
+    for(var i = 0; i < arr.length; i++)
+    {
+      var item = arr[i].node;
+      var dom = document.querySelectorAll('[x="' + item.x + '"][y="' + item.y + '"]');
+      if(dom.length > 0)
+        if(dom[0].getAttribute("isStart") != 1 && dom[0].getAttribute("isEnd") != 1)
+          dom[0].style = "background-color:" + color + ";";
+    }
+  }
+
+  function getFinishPath(arr)
+  {
+    for(var i = 0; i < arr.length; i++)
+    {
+      if(arr[i].isFinish())
+        return arr[i];
+    }
+
+    return false;
+  }
+
+  function getNearestNodes(path)
+  {
+    var arr = [];
+    var node = path.node;
+
+    for(var i = -1; i < 2; i++)
+    {
+      for(var j = -1; j < 2; j++)
+      {
+        if(i != 0 && j != 0)
+          continue;
+
+        var newY = node.y + i;
+        var newX = node.x + j;
+
+        if(newX >= 0 && newX < width && newY >= 0 && newY < height && !isWall(newX, newY))
+        {
+          var newNode = new Node(newX, newY);
+          var newPath = new Path(newNode, path, "path");
+
+          if(Node.compare(newNode, endPoint))
+          {
+            newPath.status = "finish";
+          }
+
+          arr.push(newPath);
+        }
+      }
+    }
+    return arr;
+  }
+
+  function isWall(x, y)
+  {
+    var dom = document.querySelectorAll('[x="' + x + '"][y="' + y + '"]');
+    if(dom.length > 0)
+      if(dom[0].getAttribute("isWall") == 1)
+        return true;
+
+    return false;
+  }
+
+  function getStartPath()
+  {
+    var items = document.getElementsByClassName("cell");
+    var arr = [];
+    for(var k = 0; k < items.length; k++)
+    {
+      if(items[k].getAttribute("isStart") == 1)
+      {
+          var x = parseInt(items[k].getAttribute("x"));
+          var y = parseInt(items[k].getAttribute("y"));
+
+          arr.push(new Path(new Node(x, y), null, "start"));
+      }
+    }
+
+    if(arr.length == 1)
+      return arr[0];
+
+    return null;
+  }
+
+  function getEndNode()
+  {
+    var items = document.getElementsByClassName("cell");
+    var arr = [];
+    for(var k = 0; k < items.length; k++)
+    {
+      if(items[k].getAttribute("isEnd") == 1)
+      {
+          var x = parseInt(items[k].getAttribute("x"));
+          var y = parseInt(items[k].getAttribute("y"));
+
+          arr.push(new Node(x, y));
+      }
+    }
+
+    if(arr.length == 1)
+      return arr[0];
+
+    return null;
+  }
+</script>
+<style media="screen">
+  body
+  {
+    margin:0px;
+    background-color:black;
+    overflow: hidden;
+  }
+
+  #table
+  {
+    display:inline;
+    margin:10px;
+  }
+
+  .row
+  {
+    display:flex;
+  }
+
+  .cell
+  {
+    width:40px;
+    height:40px;
+    margin:1px;
+    text-align: center;
+    background-color:#f2f1f1;
+  }
+
+  .button
+  {
+    border-radius:10px;
+    margin-right: 10px;
+    background-color:#cdc064;
+    font-family: monospace;
+    color:white;
+    font-size:2em;
+    padding:5px;
+    width:150px;
+    text-align: center;
+  }
+
+  #panel
+  {
+    display:flex;
+    width:100%;
+    padding:5px;
+    background:#f4f3bb;
+  }
+
+  #menu {
+    display: none;
+    position: absolute;
+    background-color: white;
+    border: 2px solid #f44336;
+    border-radius: 5px;
+    color:black;
+    text-align:center;
+    width:200px;
+    font-size:x-large;
+    font-family: sans-serif;
+    cursor: context-menu;
+  }
+  .item
+  {
+    color:#f44336;
+  }
+
+  .item:hover, .item.active
+  {
+    color:#751a1a;
+    background-color:pink;
+  }
+</style>
+<body>
+
+  <div id="menu">
+    Menu
+    <div class="item active" mode="wall">
+      Wall
+    </div>
+    <div class="item" mode="start">
+      Start point
+    </div>
+    <div class="item" mode="end">
+      Finish point
+    </div>
+    <div class="item" mode="remove">
+      Remove
+    </div>
+  </div>
+
+  <div id="panel">
+    <div class="button" onclick="find()">
+      Find path!
+    </div>
+
+    <div class="button" onclick="reset()">
+      Reset
+    </div>
+  </div>
+  <div id="table">
+  </div>
+
+  <script type="text/javascript">
+    generateTables();
+  </script>
+</body>
