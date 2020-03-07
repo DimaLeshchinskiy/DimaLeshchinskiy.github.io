@@ -25,13 +25,17 @@ h4 {
   margin-bottom: 30px;
 }
 
+.title-s {
+  font-weight: bold;
+  color: #303030;
+}
+
+.pull-right {
+  float: right;
+}
+
 .jumbotron {
-  background-color: var(--col2);
-  background-image: url("../img/giphy.gif");
-  background-repeat: no-repeat;
-  background-size: cover;
-  background-blend-mode: darken;
-  background-position: center;
+  background-color: var(--col1);
   color: #fff;
   padding: 100px 25px;
   font-family: Montserrat, sans-serif;
@@ -167,26 +171,19 @@ h4 {
   z-index: 9999;
   border: 0;
   font-size: 12px !important;
-  line-height: 1.42857143 !important;
+  line-height: 1.4 !important;
   letter-spacing: 4px;
   border-radius: 0;
   font-family: Montserrat, sans-serif;
 }
 
-.navbar li a,
-.navbar .navbar-brand {
-  color: #fff !important;
+.navbar a {
+  color: white !important;
 }
 
-.navbar-nav li a:hover,
-.navbar-nav li.active a {
-  color: #f4511e !important;
-  background-color: #fff !important;
-}
-
-.navbar-default .navbar-toggle {
-  border-color: transparent;
-  color: #fff !important;
+.nav-pills .nav-link.active, .nav-pills .show>.nav-link {
+  background-color: white !important;
+  color: black !important;
 }
 
 #project .card {
